@@ -9,7 +9,7 @@ var client = new net.Socket();
 client.connect(PORT, HOST, function() {
 
     console.log('CONNECTED TO: ' + HOST + ':' + PORT);
-    // ½¨Á¢Á¬½ÓºóÁ¢¼´Ïò·şÎñÆ÷·¢ËÍÊı¾İ£¬·şÎñÆ÷½«ÊÕµ½ÕâĞ©Êı¾İ 
+    // å»ºç«‹è¿æ¥åç«‹å³å‘æœåŠ¡å™¨å‘é€æ•°æ®ï¼ŒæœåŠ¡å™¨å°†æ”¶åˆ°è¿™äº›æ•°æ® 
     // client.write('I am Chuck Norris!');
 /*
     var r1 = new Buffer(2048);
@@ -31,16 +31,33 @@ client.connect(PORT, HOST, function() {
 });
     
 
-// Îª¿Í»§¶ËÌí¼Ó¡°data¡±ÊÂ¼ş´¦Àíº¯Êı
-// dataÊÇ·şÎñÆ÷·¢»ØµÄÊı¾İ
+// ä¸ºå®¢æˆ·ç«¯æ·»åŠ â€œdataâ€äº‹ä»¶å¤„ç†å‡½æ•°
+// dataæ˜¯æœåŠ¡å™¨å‘å›çš„æ•°æ®
 client.on('data', function(data) {
 
     console.log('DATA:');
     console.log(hexy.hexy(data));
     console.log('===============================');
+    
+    if(data[0] == 0x181)
+    {
+        console.log("æ‰¾ä¸ªç†ç”±é€€å‡º");
+        console.log(hexy.hexy(new Buffer("~quit\r\n")));
+        client.write(new Buffer("~quit\r\n"));
+    }
+    else
+    {
+        var buf2 = new Buffer([ 
+        0x60, 0x00, 0x04, 0x00, 0x00, 0x04, 0x00, 0x00, // header
+        0x7a, 0x32, 0x00, 0x00  // one int
+        ]);
+        client.write(buf2);
+
+    }
+    
 });
 
-// Îª¿Í»§¶ËÌí¼Ó¡°close¡±ÊÂ¼ş´¦Àíº¯Êı
+// ä¸ºå®¢æˆ·ç«¯æ·»åŠ â€œcloseâ€äº‹ä»¶å¤„ç†å‡½æ•°
 client.on('close', function() {
     console.log('Connection closed');
 });

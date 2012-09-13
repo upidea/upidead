@@ -45,4 +45,20 @@ exports.handle_quit = function(response, connection, packet_header, packet)
     
     response(OK);
 }
+/*
+Connection.prototype.quit_respond = function(retval, msg) {
+    var self = this;
+    this.respond(221, msg || "closing connection. Have a jolly good day.", function() {
+        self.disconnect();
+    });
+};
 
+Connection.prototype.cmd_quit = function(args) {
+    // RFC 5321 Section 4.3.2
+    // QUIT does not accept arguments
+    if (args) {
+        return this.respond(501, "Syntax error");
+    }
+    plugins.run_hooks('quit', this);
+};
+*/

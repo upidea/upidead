@@ -1,4 +1,18 @@
 a = new Buffer(0);
+
+    // expose api methods as client instance methods
+    var apimethods = Object.getOwnPropertyNames(a)
+    apimethods.forEach(function(name, i, apimethods)
+    {
+    	console.log(name);
+    	console.log(i);
+    	console.log(apimethods);
+    });
+    
+    process.exit();
+    
+
+a = new Buffer(0);
 console.log(a);
 console.log(a.length);
 

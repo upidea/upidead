@@ -136,10 +136,14 @@ exports.createConnection = function(client, server) {
 Connection.prototype.process_line = function (line) {
     var self = this;
     
+console.log(this.state);
     if(line[0] === 0x60)
     {
         this.current_line = line;  // 不确定这里是否会做数据拷贝影响性能
-        protocols.handle_protocol(this, this.current_line);
+        if (this.state === STATE_CMD) {
+            this.state = STATE_PAUSE_CMD;
+            protocols.handle_protocol(this, this.current_line);
+        }
     } else {
         // 
         line = line.slice(1).toString('binary');
@@ -276,6 +280,9 @@ Connection.prototype.respond = function(code, msg, func) {
     if (this.disconnected) {
         return;
     }
+
+if(code != 0)
+{
     // Check to see if DSN object was passed in
     if (typeof msg === 'object' && msg.constructor.name === 'DSN') {
         // Override
@@ -316,14 +323,17 @@ Connection.prototype.respond = function(code, msg, func) {
     catch (err) {
         return this.fail("Writing response: " + buf + " failed: " + err);
     }
+    
+}
 
     // Store the last response
     this.last_response = buf;
-
+console.log("STAT1: " + this.state);
     // Don't change loop state
     if (this.state !== STATE_LOOP) {
         this.state = STATE_CMD;
     }
+console.log("STAT2: " + this.state);
 
     // Run optional closure before handling and further commands
     if (func) func();

@@ -429,14 +429,18 @@ protocols.handle_protocol = function(object, packet) {
         // Store the last response
         this.last_response = buf;
         */
-    
+        object.respond(0);
+/*        
+console.log("eSTAT1: " + object.state);    
         // Don't change loop state
         if (object.state !== object.STATE_LOOP) {
             object.state = object.STATE_CMD;
         }
-    
+console.log("eSTAT2: " + object.state);
+
         // Process any buffered commands (PIPELINING)
         object._process_data();
+*/        
     }
 
     // console.log(protocols.protocol_list);
@@ -444,66 +448,7 @@ protocols.handle_protocol = function(object, packet) {
     // 对二进制， 解开包头
     
     // assert 等读到包头中的第五第六个字节(长度够不够？)
-    
-    var protocol_key = '';
-    if(data[0] = 0x60)
-        protocol_key += packet.readUInt16BE(5);
-    else
-    {
-        if (object.state === object.STATE_CMD) {
-            object.state = STATE_PAUSE_CMD;
-            object.current_line = packet.replace(/\r?\n/, '');
-            var matches = /^[`\\]([^ ]*)( +(.*))?$/.exec(object.current_line);
-            if (!matches) {
-                return plugins.run_hooks('unrecognized_command', object, object.current_line);
-            }
-
-            protocol_key = matches[1].toLowerCase();
-/*            
-            var method = "cmd_" + matches[1].toLowerCase();
-            
-            console.log("---------RUN Cmds: " + method);
-            
-            var remaining = matches[3] || '';
-            if (this[method]) {
-                try {
-                    this[method](remaining);
-                }
-                catch (err) {
-                    if (err.stack) {
-                        var c = this;
-                        c.logerror(method + " failed: " + err);
-                        err.stack.split("\n").forEach(c.logerror);
-                    }
-                    else {
-                        this.logerror(method + " failed: " + err);
-                    }
-                    this.respond(500, "Internal Server Error", function() {
-                        self.disconnect();
-                    });
-                }
-            }
-            else {
-                // unrecognised command
-                matches.splice(0,1);
-                matches.splice(1,1);
-                plugins.run_hooks('unrecognized_command', this, matches);
-            }
-*/            
-        }
-        else if (object.state === object.STATE_LOOP) {
-/*
-            // Allow QUIT
-            if (line.replace(/\r?\n/, '').toUpperCase() === 'QUIT') {
-                this.cmd_quit();
-            } 
-            else {
-                this.respond(this.loop_code, this.loop_msg);
-            }
-*/            
-        }
-
-    }
+    var protocol_key = '' + packet.readUInt16BE(5);
     if(protocols.protocol_list && protocols.protocol_list[protocol_key])
     {
         item = protocols.protocol_list[protocol_key];
