@@ -4,7 +4,7 @@
   "description": "upidea node tcp server template.",
   "keywords": ["server"],
   "version": "0.1.0",
-  "homepage": "https://github.com/upidea/uisrv/",
+  "homepage": "https://github.com/upidea/upidead/",
   "repository": {
     "type": "git",
     "url": "git://github.com/upidea/uisrv.git"

@@ -287,7 +287,8 @@ plugins.run_next_hook = function(hook, object, params) {
         if (object.hooks_to_run.length == 0 || 
             retval !== constants.cont)
         {
-            var respond_method = hook + "_respond";
+            // var respond_method = hook + "_respond";
+            var respond_method = "response_cmd_" + hook;
             if (item && utils.in_array(retval, [constants.deny, constants.denysoft, constants.denydisconnect, constants.denysoftdisconnect])) {
                 object.deny_respond = function (deny_retval, deny_msg) {
                     switch(deny_retval) {
@@ -352,4 +353,3 @@ plugins.run_next_hook = function(hook, object, params) {
         callback();
     }
 };
-

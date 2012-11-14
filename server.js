@@ -6,7 +6,6 @@ var logger      = require('./logger');
 var config      = require('./config');
 var conn        = require('./connection');
 // var out         = require('./outbound');
-var protocols    = require('./protocols');
 var plugins     = require('./plugins');
 var constants   = require('./constants');
 var os          = require('os');
@@ -91,10 +90,6 @@ Server.createServer = function (params) {
         conn.createConnection(client, server);
     });
     server.notes = {};
-    
-    // º”‘ÿ–≠“È
-    protocols.server = server;
-    protocols.load_protocols();
     
     plugins.server = server;
     plugins.load_plugins();
@@ -187,7 +182,7 @@ Server.createServer = function (params) {
     }
 };
 
-Server.init_master_respond = function (retval, msg) {
+Server.response_cmd_init_master = function (retval, msg) {
     Server.ready = 1;
     switch(retval) {
         case constants.ok:
@@ -199,7 +194,7 @@ Server.init_master_respond = function (retval, msg) {
     }
 }
 
-Server.init_child_respond = function (retval, msg) {
+Server.response_cmd_init_child = function (retval, msg) {
     switch(retval) {
         case constants.ok:
         case constants.cont:

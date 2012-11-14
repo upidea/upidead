@@ -11,8 +11,10 @@ var protocols     = require('./protocols');
 var plugins     = require('./plugins');
 var date_to_str = require('./utils').date_to_str;
 var ipaddr      = require('ipaddr.js');
-var buffertools = require('buffertools');
+// 这个package在windows下需要python支持， 要装的东西太多， 不胜其烦，放弃了
+// var buffertools = require('buffertools');
 var hexy      = require('hexy');
+var bufferpack = require('bufferpack');
 
 /*
 var trans       = require('./transaction');
@@ -34,6 +36,9 @@ var STATE_LOOP  = 2;
 var STATE_PAUSE = 4;
 var STATE_PAUSE_CMD = 5;
 var STATE_BIN = 6;
+
+// 导入协议
+Connection.prototype = protocols;
 
 // copy logger methods into Connection:
 for (var key in logger) {
@@ -136,18 +141,29 @@ exports.createConnection = function(client, server) {
 Connection.prototype.process_line = function (line) {
     var self = this;
     
-console.log(this.state);
     if(line[0] === 0x60)
     {
         this.current_line = line;  // 不确定这里是否会做数据拷贝影响性能
         if (this.state === STATE_CMD) {
             this.state = STATE_PAUSE_CMD;
-            protocols.handle_protocol(this, this.current_line);
+            
+            var packet_header = bufferpack.unpack('>B(ucFlag)H(usLen)B(ucCPkg)B(ucTPkg)H(usCmd)B(ucSubCmd)', line, 0);
+            var protocols_handle_method = "handle_cmd_" + packet_header.usCmd;
+            console.log(protocols_handle_method);
+            console.log(packet_header);
+            console.log(hexy.hexy(line));
+            if(this[protocols_handle_method]) {
+            	console.log("tocall");
+            	// this[protocols_handle_method](packet_header, line);
+            	this[protocols_handle_method].call(this, packet_header, line);
+            } else {
+				plugins.run_hooks('unrecognized_command', this, protocols_handle_method);            	
+            }
         }
     } else {
         // 
         line = line.slice(1).toString('binary');
-        this.logprotocol("C: " + line + ' state=' + this.state);
+        // this.logprotocol("C: " + line + ' state=' + this.state);
         // Check for non-ASCII characters
         if (/[^\x00-\x7F]/.test(line)) {
             return this.respond(501, 'Syntax error');
@@ -160,9 +176,7 @@ console.log(this.state);
             if (!matches) {
                 return plugins.run_hooks('unrecognized_command', this, this.current_line);
             }
-            var method = "cmd_" + matches[1].toLowerCase();
-            
-            console.log("---------RUN Cmds: " + method);
+            var method = "handle_cmd_" + matches[1].toLowerCase();
             
             var remaining = matches[3] || '';
             if (this[method]) {
@@ -210,13 +224,7 @@ Connection.prototype.process_data = function (data) {
         return;
     }
 
-    // Event: 'data'#
-    //    function (data) { }
-    //    The 'data' event emits either a Buffer (by default) or a string if setEncoding() was used.
-    //    Note that the data will be lost if there is no listener when a Readable Stream emits a 'data' event.
-    // 服务程序收到的是默认的Buffer，应为我们没有setEncoding
-    
-    this.current_data = buffertools.concat(this.current_data, data);
+    this.current_data = Buffer.concat([this.current_data, data]);
     this._process_data();
 };
 
@@ -280,60 +288,68 @@ Connection.prototype.respond = function(code, msg, func) {
     if (this.disconnected) {
         return;
     }
-
-if(code != 0)
-{
-    // Check to see if DSN object was passed in
-    if (typeof msg === 'object' && msg.constructor.name === 'DSN') {
-        // Override
-        code = msg.code;
-        msg = msg.reply;
-    }
-    if (!(Array.isArray(msg))) {
-        // msg not an array, make it so:
-        messages = [ '' + msg ];
-    } else {
-        // copy
-        messages = msg.slice();
-    }
-
-    if (code >= 400) {
-        this.last_reject = code + ' ' + messages.join(' ');
-        if (this.deny_includes_uuid) {
-            uuid = (this.transaction || this).uuid;
-            if (this.deny_includes_uuid > 1) {
-                uuid = uuid.substr(0, this.deny_includes_uuid);
-            }
-        }
-    }
     
-    var mess;
-    var buf = '';
+    if(!code)
+    {
+    	// 处理二进制数据的返回
+	    try {
+	        this.client.write(buf);
+	    }
+	    catch (err) {
+	        return this.fail("Writing response: " + buf + " failed: " + err);
+	    }
+    } else 	{
+	    // Check to see if DSN object was passed in
+	    if (typeof msg === 'object' && msg.constructor.name === 'DSN') {
+	        // Override
+	        code = msg.code;
+	        msg = msg.reply;
+	    }
+	    if (!(Array.isArray(msg))) {
+	        // msg not an array, make it so:
+	        messages = [ '' + msg ];
+	    } else {
+	        // copy
+	        messages = msg.slice();
+	    }
+	
+	    if (code >= 400) {
+	        this.last_reject = code + ' ' + messages.join(' ');
+	        if (this.deny_includes_uuid) {
+	            uuid = (this.transaction || this).uuid;
+	            if (this.deny_includes_uuid > 1) {
+	                uuid = uuid.substr(0, this.deny_includes_uuid);
+	            }
+	        }
+	    }
+	    
+	    var mess;
+	    var buf = '';
+	
+	    while (mess = messages.shift()) {
+	        var line = code + (messages.length ? "-" : " ") + 
+	            (uuid ? '[' + uuid + '] ' : '' ) + mess;
+	        this.logprotocol("S: " + line);
+	        buf = buf + line + "\r\n";
+	    }
+	
+	    try {
+	        this.client.write(buf);
+	    }
+	    catch (err) {
+	        return this.fail("Writing response: " + buf + " failed: " + err);
+	    }
 
-    while (mess = messages.shift()) {
-        var line = code + (messages.length ? "-" : " ") + 
-            (uuid ? '[' + uuid + '] ' : '' ) + mess;
-        this.logprotocol("S: " + line);
-        buf = buf + line + "\r\n";
-    }
+	    // Store the last response
+	    this.last_response = buf;
+	}
 
-    try {
-        this.client.write(buf);
-    }
-    catch (err) {
-        return this.fail("Writing response: " + buf + " failed: " + err);
-    }
-    
-}
 
-    // Store the last response
-    this.last_response = buf;
-console.log("STAT1: " + this.state);
     // Don't change loop state
     if (this.state !== STATE_LOOP) {
         this.state = STATE_CMD;
     }
-console.log("STAT2: " + this.state);
+
 
     // Run optional closure before handling and further commands
     if (func) func();
@@ -353,7 +369,11 @@ Connection.prototype.disconnect = function() {
     plugins.run_hooks('disconnect', this);
 };
 
-Connection.prototype.disconnect_respond = function () {
+Connection.prototype.run_hooks = function(hook, object) {
+    plugins.run_hooks(hook, object);
+};
+
+Connection.prototype.response_cmd_disconnect = function () {
     this.disconnected = true;
     var logdetail = [
         'ip='    + this.remote_ip,
@@ -372,35 +392,14 @@ Connection.prototype.disconnect_respond = function () {
     this.client.end();
 };
 
-Connection.prototype.get_capabilities = function() {
-    var capabilities = []
-    
-    return capabilities;
-};
-
-Connection.prototype.tran_uuid = function () {
-    this.tran_count++;
-    return this.uuid + '.' + this.tran_count;
-}
-
-Connection.prototype.reset_transaction = function() {
-    delete this.transaction;
-};
-
-Connection.prototype.init_transaction = function() {
-    this.transaction = 0; // trans.createTransaction(this.tran_uuid());
-}
-
-Connection.prototype.loop_respond = function (code, msg) {
+Connection.prototype.response_cmd_loop = function (code, msg) {
     this.state = STATE_LOOP;
     this.loop_code = code;
     this.loop_msg = msg;
     this.respond(code, msg);
 }
 
-/////////////////////////////////////////////////////////////////////////////
-// TEXT Command Responses
-Connection.prototype.unrecognized_command_respond = function(retval, msg) {
+Connection.prototype.response_cmd_unrecognized_command = function(retval, msg) {
     var self = this;
     switch(retval) {
         case constants.ok:
@@ -422,7 +421,7 @@ Connection.prototype.unrecognized_command_respond = function(retval, msg) {
     }
 };
 
-Connection.prototype.connect_respond = function(retval, msg) {
+Connection.prototype.response_cmd_connect = function(retval, msg) {
     var self = this;
     // RFC 5321 Section 4.3.2 states that the only valid SMTP codes here are:
     // 220 = Service ready
@@ -460,104 +459,5 @@ Connection.prototype.connect_respond = function(retval, msg) {
                     }
                 }
                 this.respond(220, msg || greeting);
-                // this.respond(); // 不应答，只改状态
     }
 };
-
-Connection.prototype.helo_respond = function(retval, msg) {
-    var self = this;
-    switch (retval) {
-        case constants.deny:
-                this.respond(550, msg || "HELO denied", function() {
-                    self.greeting = null;
-                    self.hello_host = null;
-                });
-                break;
-        case constants.denydisconnect:
-                this.respond(550, msg || "HELO denied", function() {
-                    self.disconnect();
-                });
-                break;
-        case constants.denysoft:
-                this.respond(450, msg || "HELO denied", function() {
-                    self.greeting = null;
-                    self.hello_host = null;
-                });
-                break;
-        case constants.denysoftdisconnect:
-                this.respond(450, msg || "HELO denied", function() {
-                    self.disconnect();
-                });
-                break;
-        default:
-                this.respond(250, "Haraka says hi " + 
-                    ((this.remote_host && this.remote_host !== 'DNSERROR' 
-                    && this.remote_host !== 'NXDOMAIN') ? this.remote_host + ' ' : '') 
-                    + "[" + this.remote_ip + "]");
-    }
-};
-
-Connection.prototype.capabilities_respond = function (retval, msg) {
-    this.respond(250, this.capabilities);
-};
-
-Connection.prototype.quit_respond = function(retval, msg) {
-    var self = this;
-    this.respond(221, msg || "closing connection. Have a jolly good day.", function() {
-        self.disconnect();
-    });
-};
-
-Connection.prototype.noop_respond = function(retval, msg) {
-    var self = this;
-    switch (retval) {
-        case constants.deny:
-                this.respond(500, msg || "Stop wasting my time");
-                break;
-        case constants.denydisconnect:
-                this.respond(500, msg || "Stop wasting my time", function() {
-                    self.disconnect();
-                });
-                break;
-        default:
-                this.respond(250, "OK");
-    }
-};
-
-/////////////////////////////////////////////////////////////////////////////
-// TEXT Commands
-
-Connection.prototype.cmd_helo = function(line) {
-    var results = (new String(line)).split(/ +/);
-    var host = results[0];
-    if (!host) {
-        return this.respond(501, "HELO requires domain/address - see RFC-2821 4.1.1.1");
-    }
-    
-    if (this.hello_host) {
-        return this.respond(503, "You already said HELO");
-    }
-    
-    this.greeting   = 'HELO';
-    this.hello_host = host;
-
-    plugins.run_hooks('helo', this, host);
-};
-
-Connection.prototype.cmd_quit = function(args) {
-    // RFC 5321 Section 4.3.2
-    // QUIT does not accept arguments
-    if (args) {
-        return this.respond(501, "Syntax error");
-    }
-    plugins.run_hooks('quit', this);
-};
-
-Connection.prototype.cmd_noop = function() {
-    plugins.run_hooks('noop', this);
-};
-
-Connection.prototype.cmd_help = function() {
-    this.respond(250, "Not implemented");
-};
-

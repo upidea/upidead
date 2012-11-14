@@ -64,7 +64,7 @@ logger.log = function (level, data) {
     }
 }
 
-logger.log_respond = function (retval, msg, data) {
+logger.response_cmd_log = function (retval, msg, data) {
     // any other return code is irrelevant
     if (retval === constants.cont) {
         return console.log(data.data);
