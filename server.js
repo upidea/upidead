@@ -10,6 +10,7 @@ var plugins     = require('./plugins');
 var constants   = require('./constants');
 var os          = require('os');
 var semver      = require('semver');
+// var db			= require('./db_mysql');
 
 var cluster;
 try { cluster = require('cluster') } // cluster can be installed with npm
@@ -90,6 +91,27 @@ Server.createServer = function (params) {
         conn.createConnection(client, server);
     });
     server.notes = {};
+    server.db = require('./db_mysql');
+    server.db.init(config_data.main.dbuser, config_data.main.dbpass, 
+    	config_data.main.dbname, config_data.main.dbcharset, 
+    	config_data.main.host, config_data.main.port);
+    	
+	/**
+	测试下server.db是否能正常查询工作
+	server.db.query("select * from gm_account", [],
+		function(err, results)
+		{
+			if (err) {
+				console.log('error fetching some active users: ' + err);
+				return;
+			}
+	
+			console.log(results);
+			
+			for (var i = 0; i < results.length; i++)
+				console.log('got active user ' + results[i]);
+		});
+	*/
     
     plugins.server = server;
     plugins.load_plugins();
@@ -234,4 +256,5 @@ function listening () {
     Server.ready = 1;
    
     // out.load_queue();
+
 }

@@ -109,6 +109,10 @@ function setupClient(self) {
 function Connection(client, server) {
     this.client = client;
     this.server = server;
+    console.log("I'm right here!!!!");
+    console.log(this.server.db);
+    console.log("111111111111I'm right here!!!!");
+    
     this.current_data = new Buffer(0);
     this.current_line = null;
     this.state = STATE_PAUSE;
